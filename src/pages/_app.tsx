@@ -1,5 +1,6 @@
 import React, { useEffect } from 'react';
 import toast from 'react-hot-toast';
+import { Provider } from 'react-redux';
 import { useRouter } from 'next/router';
 import App from 'next/app';
 import type { AppProps, AppContext } from 'next/app';
@@ -14,12 +15,15 @@ import { getServerSideApiServer } from '@common/api/utils';
 import { NetworkModeToast } from '@components/network-mode-toast';
 import { Modals } from '@components/modals';
 import { store } from '@common/state/store';
-import { Provider } from 'react-redux';
+import { QueryClient, QueryClientProvider } from 'react-query';
+import { SafeSuspense } from '@components/ssr-safe-suspense';
 
 interface ExplorerAppProps extends AppProps {
   apiServer: string;
   networkMode: NetworkMode;
 }
+
+const queryClient = new QueryClient();
 
 function ExplorerApp({
   Component,
@@ -35,15 +39,19 @@ function ExplorerApp({
   }, []);
 
   return (
-    <Provider store={store}>
-      <Devtools />
-      <AppConfig isHome={isHome} fullWidth={fullWidth}>
-        <AtomDebug />
-        <Component apiServer={apiServer} networkMode={networkMode} {...props} />
-        <Modals />
-        <NetworkModeToast />
-      </AppConfig>
-    </Provider>
+    <QueryClientProvider client={queryClient}>
+      <Provider store={store}>
+        <Devtools />
+        <AppConfig isHome={isHome} fullWidth={fullWidth}>
+          <AtomDebug />
+          <SafeSuspense fallback={<></>}>
+            <Component apiServer={apiServer} networkMode={networkMode} {...props} />
+            <Modals />
+            <NetworkModeToast />
+          </SafeSuspense>
+        </AppConfig>
+      </Provider>
+    </QueryClientProvider>
   );
 }
 
