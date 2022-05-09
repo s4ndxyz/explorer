@@ -8,17 +8,22 @@ import {
 } from '../hooks/currently-in-view-hooks';
 import { NoActivityIllustration } from '@components/no-activity-illustration';
 import { Caption } from '@components/typography';
+import { useEffect, useState } from 'react';
 
 const ConfirmedTransactionsList = () => {
   const [transactions, { hasNextPage, fetchNextPage, isFetchingNextPage }] =
     useAccountInViewTransactions();
+  const [hasNext, setHasNext] = useState(false);
+  useEffect(() => {
+    setHasNext(hasNextPage);
+  }, [hasNextPage]);
   if (!transactions) return null;
   return (
     <InfiniteTransactionsList
       data={transactions}
       isFetchingNextPage={isFetchingNextPage}
       fetchNextPage={fetchNextPage}
-      hasNextPage={hasNextPage}
+      hasNextPage={hasNext}
       showLoadMoreButton
     />
   );
@@ -27,13 +32,17 @@ const ConfirmedTransactionsList = () => {
 const MempoolTransactionsList = () => {
   const [transactions, { hasNextPage, fetchNextPage, isFetchingNextPage }] =
     useAccountInViewPendingTransactions();
+  const [hasNext, setHasNext] = useState(false);
+  useEffect(() => {
+    setHasNext(hasNextPage);
+  }, [hasNextPage]);
   if (!transactions) return null;
   return (
     <InfiniteTransactionsList
       data={transactions}
       isFetchingNextPage={isFetchingNextPage}
       fetchNextPage={fetchNextPage}
-      hasNextPage={hasNextPage}
+      hasNextPage={hasNext}
       showLoadMoreButton
     />
   );

@@ -22,6 +22,7 @@ export function InfiniteTransactionsList({
   hasNextPage: boolean;
   showLoadMoreButton?: boolean;
 }) {
+  console.log(111111, isFetchingNextPage, fetchNextPage, showLoadMoreButton, hasNextPage);
   return (
     <>
       <Box position="relative">
