@@ -2,65 +2,71 @@ import React from 'react';
 import { Box, Grid, Stack, StxInline, StackProps, color } from '@stacks/ui';
 import { border } from '@common/utils';
 import { ClarityIcon } from '@sandbox/components/clarity-icon';
-import { Tooltip } from '@components/tooltip';
 import FunctionIcon from 'mdi-react/FunctionIcon';
 import { DropIcon } from '@components/icons/drop';
-import { Routes } from '@sandbox/common/types';
 import Link from 'next/link';
-import { useConnect } from '@sandbox/hooks/use-connect';
 import { useAppSelector } from '@common/state/hooks';
 import { selectActiveNetwork } from '@common/state/network-slice';
 import { buildUrl } from '@components/links';
+import { useRouter } from 'next/router';
+import { useUser } from '@modules/sandbox/useUser';
 
-export const SideNav: React.FC<StackProps> = props => {
-  const { isSignedIn } = useConnect();
+export const SideNav: React.FC<StackProps> = () => {
   const networkMode = useAppSelector(selectActiveNetwork).mode;
+  const router = useRouter();
+  const { isConnected } = useUser();
 
   const navigation: {
     label: string;
     url: string;
     icon: any;
     isDisabled?: boolean;
+    isSelected: boolean;
   }[] = [
     {
       label: 'Write & Deploy Contracts',
       url: buildUrl(`/sandbox/deploy`, networkMode),
       icon: <ClarityIcon size="24px" />,
+      isSelected: router.pathname === '/sandbox/deploy',
     },
     {
       label: 'Call Functions',
       url: buildUrl(`/sandbox/contract-call`, networkMode),
       icon: <Box as={FunctionIcon} size="24px" />,
+      isSelected: router.pathname === '/sandbox/contract-call',
     },
     {
       label: 'STX Transfer',
       url: buildUrl(`/sandbox/transfer`, networkMode),
       icon: <Box as={StxInline} size="20px" />,
+      isSelected: router.pathname === '/sandbox/transfer',
     },
     {
       label: 'Testnet Faucet',
       url: buildUrl(`/sandbox/faucet`, networkMode),
       icon: <Box as={DropIcon} size="24px" />,
-      isDisabled: !isSignedIn || networkMode === 'mainnet',
+      isDisabled: !isConnected || networkMode === 'mainnet',
+      isSelected: router.pathname === '/sandbox/faucet',
     },
   ];
 
   return (
-    <Stack borderRight={border()} {...props}>
+    <Stack borderRight={border()}>
       {navigation.map(nav =>
         nav.isDisabled ? null : (
-          <Link href={nav.url}>
+          <Link href={nav.url} key={nav.url}>
             <Grid
               borderRight={border()}
-              bg={color('bg')}
+              bg={nav.isSelected ? '#efefef' : color('bg')}
               borderBottom={border()}
               size="72px"
               placeItems="center"
               justifyContent="center"
               color={color('text-title')}
+              marginBottom={'0px !important'}
               _hover={{
                 cursor: 'pointer',
-                bg: color('bg-2'),
+                bg: '#efefef',
               }}
             >
               {nav.icon}

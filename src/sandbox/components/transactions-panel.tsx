@@ -1,8 +1,7 @@
-import React from 'react';
+import React, { FC, useState } from 'react';
 import { Box, color, Flex, Grid, Stack, transition } from '@stacks/ui';
 import { Caption, Text, Title } from '@components/typography';
 import { border } from '@common/utils';
-import { useUser } from '@sandbox/hooks/use-user';
 import { TxItem } from '@components/transaction-item';
 import { useRouter } from 'next/router';
 
@@ -14,11 +13,9 @@ import {
 } from '@sandbox/store/sandbox';
 import { IconButton } from '@components/icon-button';
 import { ChevronDown } from '@components/icons/chevron-down';
-import { Transaction } from '@stacks/stacks-blockchain-api-types';
+import { MempoolTransaction, Transaction } from '@stacks/stacks-blockchain-api-types';
 import { Pending } from '@components/status';
 import { Badge } from '@components/badge';
-import { useCodeEditor } from '@sandbox/components/code-editor/code-editor';
-import { useClarityRepl } from '@sandbox/hooks/use-clarity-repl';
 import { ContractCallIcon } from '@components/icons/contract-call';
 import { InfoCircleIcon } from '@components/icons/info-circle';
 import { ExternalLinkIcon } from '@components/icons/external-link';
@@ -27,11 +24,14 @@ import { FilteredMessage, FilterPanel } from '@components/filter-panel';
 
 import { FilterIcon } from '@components/icons/filter';
 import { functionCallViewState } from '@sandbox/store/views';
-import { useRecoilState, useRecoilValue, useSetRecoilState } from 'recoil';
-import { useAppSelector } from '@common/state/hooks';
+import { useSetRecoilState } from 'recoil';
+import { useAppDispatch, useAppSelector } from '@common/state/hooks';
 import { selectActiveNetwork } from '@common/state/network-slice';
-import { TxFilterTypes } from '@features/transactions-filter/transactions-filter-slice';
 import { useFilterState } from '@common/hooks/use-filter-state';
+import { useTransactionQueries } from '@features/transaction/use-transaction-queries';
+import { useQuery } from 'react-query';
+import { transactionQK, TransactionQueryKeys } from '@features/transaction/query-keys';
+import { setCodeBody } from '@modules/sandbox/sandbox-slice';
 
 const PanelHeader: React.FC = () => {
   const { toggleFilterVisibility } = useFilterState();
@@ -62,10 +62,10 @@ const PanelHeader: React.FC = () => {
 
 const LoadButton = ({ codeBody }: { codeBody: string }) => {
   const router = useRouter();
+  const activeNetworkMode = useAppSelector(selectActiveNetwork).mode;
   const [loaded, setLoaded] = React.useState(false);
   const [clicked, setClicked] = React.useState(false);
-  const [_, setCodeBody] = useCodeEditor();
-  const { setResult } = useClarityRepl();
+  const dispatch = useAppDispatch();
 
   return loaded ? (
     <Badge userSelect="none" border={border()} color={color('text-caption')}>
@@ -97,10 +97,9 @@ const LoadButton = ({ codeBody }: { codeBody: string }) => {
           borderLeft={border()}
           onClick={() => {
             setClicked(false);
-            setCodeBody(codeBody);
+            dispatch(setCodeBody({ codeBody }));
             setLoaded(true);
-            setResult(undefined);
-            void router.push(buildUrl('/sandbox/deploy'));
+            void router.push(buildUrl('/sandbox/deploy', activeNetworkMode));
             setTimeout(() => {
               setLoaded(false);
             }, 3000);
@@ -114,11 +113,11 @@ const LoadButton = ({ codeBody }: { codeBody: string }) => {
 };
 
 const TxDetailsFunctions = ({
-  hasFunctionsAvailable,
-  contractInterface,
-  contractId,
-  status,
-}: any) => {
+                              hasFunctionsAvailable,
+                              contractInterface,
+                              contractId,
+                              status,
+                            }: any) => {
   const router = useRouter();
   const setView = useSetRecoilState(functionCallViewState);
   const setQuery = useSetRecoilState(contractSearchQueryState);
@@ -228,15 +227,18 @@ const TxDetails: React.FC<{
   contractId: string;
 }> = React.memo(({ contractId, txId, type, status }) => {
   const apiServer = useAppSelector(selectActiveNetwork).url;
-  const contractInterface = useRecoilValue(
-    txContractState({
-      apiServer,
-      contractId,
-    })
+  const queries = useTransactionQueries();
+
+  const { data: contract } = useQuery(
+    transactionQK(TransactionQueryKeys.contract, contractId),
+    queries.fetchContract(contractId),
+    { staleTime: Infinity, enabled: !!contractId }
   );
 
   const hasFunctionsAvailable =
-    type === 'smart_contract' && status === 'success' && contractInterface?.abi?.functions?.length;
+    type === 'smart_contract' && status === 'success' && contract?.abi?.functions?.length;
+
+  if (!contract) return null;
 
   return (
     <>
@@ -252,13 +254,13 @@ const TxDetails: React.FC<{
             <Caption fontWeight="500" color={color('text-body')}>
               Redeploy contract
             </Caption>
-            <LoadButton codeBody={contractInterface.source_code} />
+            <LoadButton codeBody={contract.source_code} />
           </Flex>
           <TxDetailsFunctions
             contractId={contractId}
             status={status}
             hasFunctionsAvailable={hasFunctionsAvailable}
-            contractInterface={contractInterface}
+            contractInterface={contract}
           />
           <TxLink txid={txId}>
             <Flex
@@ -290,20 +292,17 @@ const TxDetails: React.FC<{
 });
 
 const SandboxTxItem = React.memo(
-  ({ tx, isLast, ...rest }: { tx: Transaction; isLast?: boolean }) => {
-    const { principal } = useUser();
-    const [detailsVisibility, setDetailsVisibility] = useRecoilState(txDetailsState(tx.tx_id));
-    const detailsVisible = detailsVisibility === 'visible';
-
+  ({ tx, isLast, stxAddress }: { tx: Transaction; isLast?: boolean; stxAddress: string }) => {
+    const [detailsVisible, setDetailsVisible] = useState(false);
     return (
-      <Box px="loose" key={tx.tx_id} borderBottom={!isLast ? border() : undefined} {...rest}>
+      <Box px="loose" key={tx.tx_id} borderBottom={!isLast ? border() : undefined}>
         <Flex alignItems="center" justifyContent="space-between">
           <TxItem
             width="unset"
             flexGrow={0}
             hideRightElements
             minimal
-            principal={principal}
+            principal={stxAddress}
             tx={tx}
           />
           {tx.tx_type === 'token_transfer' && (
@@ -317,11 +316,7 @@ const SandboxTxItem = React.memo(
               _hover={{ bg: color('bg-alt') }}
               invert
               onClick={() => {
-                if (detailsVisibility === 'hidden') {
-                  setDetailsVisibility('visible');
-                } else {
-                  setDetailsVisibility('hidden');
-                }
+                setDetailsVisible(!detailsVisible);
               }}
               iconProps={{
                 size: '24px',
@@ -364,21 +359,24 @@ const SandboxTxItem = React.memo(
   }
 );
 
-const TxList: React.FC = React.memo(() => {
+export const TransactionsPanel: FC<{
+  transactions: Transaction[];
+  mempoolTransactions: MempoolTransaction[];
+  stxAddress: string;
+}> = React.memo(({ transactions, mempoolTransactions, stxAddress }) => {
   const { activeFilters } = useFilterState();
-  const { transactions, pendingTransactions, principal } = useUser({ suspense: true });
 
   const filteredTxs = (transactions || []).filter(tx => activeFilters[tx.tx_type]);
   const hasTxButIsFiltered = transactions?.length && filteredTxs?.length === 0;
 
   const pendingList = React.useMemo(
     () =>
-      pendingTransactions?.map(tx => (
+      mempoolTransactions?.map(tx => (
         <Flex borderBottom={border()} px="loose" alignItems="center" justifyContent="space-between">
           <TxItem
             hideRightElements
             minimal
-            principal={principal}
+            principal={stxAddress}
             tx={tx}
             key={tx.tx_id}
             width="auto"
@@ -388,50 +386,21 @@ const TxList: React.FC = React.memo(() => {
           </TxLink>
         </Flex>
       )),
-    [pendingTransactions]
+    [mempoolTransactions]
   );
 
   const txList = React.useMemo(
     () =>
       filteredTxs.map((tx, key, arr) => (
-        <SandboxTxItem tx={tx} key={tx.tx_id} isLast={key === arr.length - 1} />
+        <SandboxTxItem
+          tx={tx}
+          key={tx.tx_id}
+          isLast={key === arr.length - 1}
+          stxAddress={stxAddress}
+        />
       )),
     [filteredTxs, activeFilters, transactions]
   );
-
-  return (
-    <>
-      {pendingList}
-      {filteredTxs?.length ? (
-        txList
-      ) : hasTxButIsFiltered ? (
-        <FilteredMessage />
-      ) : (
-        <Flex flexGrow={1} flexDirection="column" alignItems="center" justifyContent="center">
-          <Stack textAlign="center">
-            <Title>No Transactions</Title>
-            <Caption>Your list of transactions will display here.</Caption>
-          </Stack>
-        </Flex>
-      )}
-    </>
-  );
-});
-
-const TxLoadingPanel = React.memo(() => (
-  <Box p="extra-loose" flexGrow={1} width="100%">
-    <Flex flexDirection="column" alignItems="center">
-      <Grid placeItems="center" borderRadius="100%" size="64px" border={border()} boxShadow="mid">
-        <Pending opacity={0.5} size="32px" />
-      </Grid>
-      <Text mt="base" fontWeight="500" fontSize="14px" color={color('text-caption')}>
-        Fetching transactions...
-      </Text>
-    </Flex>
-  </Box>
-));
-
-export const TransactionsPanel = React.memo(props => {
   return (
     <Flex
       position="relative"
@@ -440,10 +409,9 @@ export const TransactionsPanel = React.memo(props => {
       bg={color('bg-alt')}
       borderBottomRightRadius="12px"
       overflow="hidden"
-      {...props}
     >
       <PanelHeader />
-      <FilterPanel showBorder bg={color('bg')} filterKey={TxFilterTypes.SandboxTxFilter} />
+      <FilterPanel showBorder bg={color('bg')} />
 
       <Flex
         flexDirection="column"
@@ -453,9 +421,21 @@ export const TransactionsPanel = React.memo(props => {
         bg={color('bg')}
         position="relative"
       >
-        <React.Suspense fallback={<TxLoadingPanel />}>
-          <TxList />
-        </React.Suspense>
+        <>
+          {pendingList}
+          {filteredTxs?.length ? (
+            txList
+          ) : hasTxButIsFiltered ? (
+            <FilteredMessage />
+          ) : (
+            <Flex flexGrow={1} flexDirection="column" alignItems="center" justifyContent="center">
+              <Stack textAlign="center">
+                <Title>No Transactions</Title>
+                <Caption>Your list of transactions will display here.</Caption>
+              </Stack>
+            </Flex>
+          )}
+        </>
       </Flex>
     </Flex>
   );

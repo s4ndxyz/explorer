@@ -7,6 +7,7 @@ const pathnameFilterScopeMap: Record<string, TxFilterTypes> = {
   '/address/[principal]': TxFilterTypes.AddressTxFilter,
   '/block/[hash]': TxFilterTypes.BlocksPageTxFilter,
   '/microblock/[hash]': TxFilterTypes.BlocksPageTxFilter,
+  '/sandbox/faucet': TxFilterTypes.SandboxTxFilter,
   '/sandbox/[...param]': TxFilterTypes.SandboxTxFilter,
   '/': TxFilterTypes.HomepageTxFilter,
 };

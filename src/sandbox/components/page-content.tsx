@@ -2,18 +2,18 @@ import React, { memo } from 'react';
 import { Box, color, Grid, Flex, Button, Stack } from '@stacks/ui';
 import { border } from '@common/utils';
 import { SideNav } from '@sandbox/components/side-nav';
-import { useRecoilValue, useSetRecoilState } from 'recoil';
+import { useRecoilValue } from 'recoil';
 import { WriteAndDeployView } from '@sandbox/components/screens/write-deploy/view';
 import { WriteAndDeployTools } from '@sandbox/components/screens/write-deploy/tools-panel';
 import { SandboxHeader } from '@sandbox/components/header';
 import { FunctionCallView } from '@sandbox/components/screens/call-functions/view';
 import { UserCard } from '@sandbox/components/user-card';
-import { FaucetView } from '@sandbox/components/views/faucet';
 import { TransactionsPanel } from '@sandbox/components/transactions-panel';
 import { rightPanelState } from '@sandbox/store/views';
 import { useConnect } from '@sandbox/hooks/use-connect';
 import { TokenTransferView } from '@sandbox/components/views/token-transfer';
 import { Title } from '@components/typography';
+import { useUser } from '@modules/sandbox/useUser';
 
 const View: React.FC<{ view: string; sender: string; contract: string }> = memo(props => {
   const { view } = props;
@@ -69,19 +69,12 @@ const View: React.FC<{ view: string; sender: string; contract: string }> = memo(
           <TokenTransferView />
         </Grid>
       );
-    case 'faucet':
-      return (
-        <React.Suspense fallback={<></>}>
-          <Grid minHeight="600px" placeItems="center" flexDirection="column">
-            <FaucetView />
-          </Grid>
-        </React.Suspense>
-      );
   }
   return null;
 });
 
 const Menu = () => {
+  const { stxAddress, transactions, mempoolTransactions } = useUser();
   return (
     <Flex
       flexGrow={1}
@@ -91,7 +84,11 @@ const Menu = () => {
       borderLeft={border()}
     >
       <UserCard />
-      <TransactionsPanel />
+      <TransactionsPanel
+        transactions={transactions || []}
+        mempoolTransactions={mempoolTransactions || []}
+        stxAddress={stxAddress}
+      />
     </Flex>
   );
 };
