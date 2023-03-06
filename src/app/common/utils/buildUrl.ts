@@ -3,6 +3,9 @@ import { LinkProps } from 'next/link';
 
 export const buildUrl = (href: LinkProps['href'], network: Network): string => {
   const url = `${href}?chain=${encodeURIComponent(network?.mode)}`;
+  if (network?.isSubnet) {
+    return `${url}&subnet=${network.url}`;
+  }
   if (network?.isCustomNetwork) {
     return `${url}&api=${network.url}`;
   }

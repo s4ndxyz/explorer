@@ -105,7 +105,11 @@ const Item: React.FC<ItemProps> = ({ item, isActive, isDisabled, onClick, isCust
       >
         <Flex alignItems="center">
           <Title display="block">{item.label}</Title>
-          {itemNetworkMode ? (
+          {item.isSubnet ? (
+            <Badge bg={`bg4.${colorMode}`} ml="8px" color={`textCaption.${colorMode}`}>
+              subnet
+            </Badge>
+          ) : itemNetworkMode ? (
             <Badge bg={`bg4.${colorMode}`} ml="8px" color={`textCaption.${colorMode}`}>
               {itemNetworkMode}
             </Badge>
@@ -190,7 +194,11 @@ export const NetworkItems: React.FC<NetworkItemsProps> = React.memo(({ onItemCli
                   void router
                     .push(
                       `/?chain=${network.mode}${
-                        network.isCustomNetwork ? `&api=${network.url}` : ''
+                        network.isSubnet
+                          ? `&subnet=${network.url}`
+                          : network.isCustomNetwork
+                          ? `&api=${network.url}`
+                          : ''
                       }`
                     )
                     .then(() => router.reload());
